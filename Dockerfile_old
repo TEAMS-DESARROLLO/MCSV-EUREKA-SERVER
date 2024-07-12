@@ -1,0 +1,40 @@
+#ERROR load metadata for docker.io/library/openjdk:17-jdk-alpine 
+#rm  ~/.docker/config.json 
+
+FROM --platform=linux/x86_64  openjdk:17-jdk-alpine as builder
+#FROM --platform=linux/x86_64  eclipse-temurin:17.0.9_9-jre-ubi9-minimal as builder
+
+#RUN addgroup -S spring && adduser -S spring -G spring
+#USER spring:spring
+
+
+WORKDIR /app/mcsv-eureka-server
+
+# esto queda en cache
+COPY ./pom.xml /app
+COPY ./eureka-server/.mvn ./.mvn
+COPY ./eureka-server/mvnw .
+COPY ./eureka-server/mvnw.cmd .
+COPY ./eureka-server/pom.xml .
+
+
+#COPY ./eureka-server .
+# cache
+
+# clean up the file -- PARA EVITAR ERRORES COMO bin/sh: 1 mvn not found docker, SOBRE TODO EN SO WINDOWS
+#RUN sed -i 's/\r$//' mvnw
+
+#RUN ./mvnw clean package -Dmaven.test.skip -Dmaven.main.skip -Dspring-boot.repackage.skip && rm -r ./target/
+RUN ./mvnw dependency:go-offline
+COPY ./eureka-server/src ./src
+
+RUN ./mvnw clean package -DskipTests
+
+
+FROM --platform=linux/x86_64  openjdk:17-jdk-alpine 
+WORKDIR /app
+COPY --from=builder /app/mcsv-eureka-server/target/server-eureka-1.0.1.jar .
+
+EXPOSE 8761
+
+ENTRYPOINT ["java","-jar","server-eureka-1.0.1.jar"]
